@@ -18,26 +18,27 @@ def fifo(dfg, d):
 
     def realize_q(n, row):
         pnl = 0
+        r = row
 
         for j in range(n):
             buy_row = dfg.iloc[j]
             if buy_row.q <= 0.0001:
                 continue
 
-            q = -row.q
+            q = -r.q
             if buy_row.q >= q:
                 adj_q = q
             else:
                 adj_q = buy_row.q
 
-            if row.d > d:
-                pnl += row.cs * q * (row.p - buy_row.p)
+            if r.d > d:
+                pnl += r.cs * adj_q * (r.p - buy_row.p)
 
             dfg.at[j, 'q'] = buy_row.q - adj_q
-            dfg.at[n, 'q'] = row.q + adj_q
-            row.q = dfg.iloc[n].q
+            dfg.at[n, 'q'] = r.q + adj_q
+            r = dfg.iloc[n]
 
-            if row.q > 0.0001:
+            if r.q > 0.0001:
                 break
 
         return pnl

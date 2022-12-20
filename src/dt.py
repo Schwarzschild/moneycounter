@@ -4,6 +4,10 @@ import pytz
 time_zone = 'American/New_York'
 
 
+def get_time_zone():
+    return time_zone
+
+
 def our_now():
     # This results in a time that can be compared values in our database
     # even if saved by a human entering wall clock time into an admin field.
