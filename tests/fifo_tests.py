@@ -2,8 +2,8 @@ import os
 import unittest
 from datetime import datetime
 import pandas as pd
-from src.pnl import fifo, realized_gains
-from src.dt import our_localize
+from src.moneycounter import fifo, realized_gains
+from src.moneycounter.dt import our_localize
 
 
 class FifoTests(unittest.TestCase):
