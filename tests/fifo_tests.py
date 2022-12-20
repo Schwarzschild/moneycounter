@@ -1,37 +1,46 @@
+import os
 import unittest
-import datetime
-from datetime import date
+from datetime import datetime
 import pandas as pd
-from src.pnl import fifo
+from src.pnl import fifo, realized_gains
+from src.dt import our_localize
 
 
 class FifoTests(unittest.TestCase):
-    def setUp(self):
-        d = [date(2020, 3, 22),
-             date(2020, 4, 25),
-             date(2021, 10, 22),
-             date(2021, 10, 25),
-             date(2021, 10, 26),
-             date(2022, 1, 6),
-             date(2022, 2, 6),
-             date(2022, 3, 6),
-             date(2023, 2, 9),
-             date(2023, 3, 7)]
+    def setUp(self, a=None, t=None):
+        fn = os.path.join(os.path.dirname(__file__), 'trades.csv')
+        df = pd.read_csv(fn, parse_dates=['dt'])
 
-        self.df = pd.DataFrame({'d': d,
-                                'q': [100, -10, 100, -190, 10, 10, -10.0, 10.0, -1, -9],
-                                'p': [300, 301, 300, 301, 306, 307, 315, 310, 330, 350],
-                                'cs': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]})
+        self.df = df
+
+    def get_df(self, year, a=None, t=None):
+        year = 2022
+        dt = our_localize(datetime(year, 1, 1))
+        eoy = our_localize(datetime(year, 12, 31, 23, 59, 59))
+        # dt = pd.Timestamp(dt, tz='UTC')
+        df = self.df
+        if a is not None:
+            df = df[df.a == a]
+        if t is not None:
+            df = df[df.t == t]
+
+        df = df[df.dt <= eoy]
+        return df, dt
 
     def test_fifo(self):
         year = 2022
-        dt = datetime.datetime(year, 1, 1)
-        eoy = datetime.date(year, 12, 31)
-        dt = pd.Timestamp(dt, tz='UTC')
-        df = self.df
-        df = df[df.d <= eoy]
-        pnl = fifo(df, dt.date())
+        df, dt = self.get_df(year, a='ACCNT1', t='TICKER1')
+        pnl = fifo(df, dt)
         self.assertAlmostEqual(pnl, 90)
+
+    def test_realized(self):
+        year = 2022
+        df, _ = self.get_df(year)
+        pnl = realized_gains(df, year)
+        expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT2', 'ACCNT2'],
+                                 't': ['TICKER1', 'TICKER1', 'TICKER2'],
+                                 'realized': [90.0, 190.0, 63.0]})
+        pd.testing.assert_frame_equal(pnl, expected)
 
 
 if __name__ == '__main__':
