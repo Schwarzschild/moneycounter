@@ -1,2 +1,2 @@
 # moneycounter
-Portfolio analytic utilities
+Portfolio analytics utilities
