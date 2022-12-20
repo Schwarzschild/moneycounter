@@ -1,3 +1,4 @@
+import os
 import unittest
 from datetime import datetime
 import pandas as pd
@@ -7,7 +8,8 @@ from src.dt import our_localize
 
 class FifoTests(unittest.TestCase):
     def setUp(self, a=None, t=None):
-        df = pd.read_csv('trades.csv', parse_dates=['dt'])
+        fn = os.path.join(os.path.dirname(__file__), 'trades.csv')
+        df = pd.read_csv(fn, parse_dates=['dt'])
 
         self.df = df
 
