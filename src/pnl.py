@@ -1,3 +1,8 @@
+from datetime import date
+import pandas as pd
+from .dt import day_start_next_day, day_start
+
+
 def fifo(dfg, d):
     """
     Calculate realized gains for sells later than d.
@@ -43,5 +48,28 @@ def fifo(dfg, d):
         if row.q < 0:
             pnl = realize_q(i, row)
             realized += pnl
+
+    return realized
+
+
+def stocks_sold(trades_df, year):
+    # Find any stock sells this year
+    t1 = day_start(date(year, 1, 1))
+    t2 = day_start_next_day(date(year, 12, 31))
+    mask = (trades_df['dt'] >= t1) & (trades_df['dt'] < t2) & (trades_df['q'] < 0)
+    sells_df = trades_df.loc[mask]
+    return sells_df
+
+
+def realized_gains(trades_df, year):
+    d = date(year, 1, 1)
+    sells_df = stocks_sold(trades_df, year)
+    a_t = sells_df.loc[:, ['a', 't']]
+
+    # get only trades for a/t combos that had sold anything in the given year
+    df = pd.merge(trades_df, a_t, how='inner', on=['a', 't'])
+
+    df['d'] = pd.to_datetime(df.dt).dt.date
+    realized = df.groupby(['a', 't']).apply(fifo, d).reset_index(name="realized")
 
     return realized
