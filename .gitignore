@@ -1,0 +1,4 @@
+*.py[cod]
+*.tar
+.idea
+__pycache__

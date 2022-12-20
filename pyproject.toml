@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moneycounter"
+description = "Portfolio Analytics Utilities"
+readme = "README.md"
+maintainers = ["Marc Schwarzschild <ms@TheBrookhavenGroup.com>"]
+homepage = "https://github.com/schwarzschild/moneycounter"
+requires-python = ">=3.7"
+keywords = ["risk", "fifo", "money", "investments"]
+classifiers = [
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Accounting",
+    "Topic :: Office/Business :: Financial :: Investment"
+    ]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "pandas",
+]
+dynamic = ["version"]
