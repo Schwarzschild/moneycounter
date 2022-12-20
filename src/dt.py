@@ -1,7 +1,7 @@
 import datetime
 import pytz
 
-time_zone = 'American/New_York'
+time_zone = 'America/New_York'
 
 
 def get_time_zone():

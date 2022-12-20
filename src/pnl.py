@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, datetime
 import pandas as pd
+from src.dt import our_localize
 from .dt import day_start_next_day, day_start
 
 
-def fifo(dfg, d):
+def fifo(dfg, dt):
     """
     Calculate realized gains for sells later than d.
     Loop forward from bottom
@@ -18,27 +19,30 @@ def fifo(dfg, d):
 
     def realize_q(n, row):
         pnl = 0
-        r = row
+        quantity = row.q
+        trade_dt = row['dt']
+        cs = row.cs
+        price = row.p
 
         for j in range(n):
             buy_row = dfg.iloc[j]
             if buy_row.q <= 0.0001:
                 continue
 
-            q = -r.q
+            q = -quantity
             if buy_row.q >= q:
                 adj_q = q
             else:
                 adj_q = buy_row.q
 
-            if r.d > d:
-                pnl += r.cs * adj_q * (r.p - buy_row.p)
+            if trade_dt > dt:
+                pnl += cs * adj_q * (price - buy_row.p)
 
             dfg.at[j, 'q'] = buy_row.q - adj_q
-            dfg.at[n, 'q'] = r.q + adj_q
-            r = dfg.iloc[n]
+            quantity += adj_q
+            dfg.at[n, 'q'] = quantity
 
-            if r.q > 0.0001:
+            if quantity > 0.0001:
                 break
 
         return pnl
@@ -63,14 +67,14 @@ def stocks_sold(trades_df, year):
 
 
 def realized_gains(trades_df, year):
-    d = date(year, 1, 1)
+    dt = our_localize(datetime(year, 1, 1))
     sells_df = stocks_sold(trades_df, year)
     a_t = sells_df.loc[:, ['a', 't']]
 
     # get only trades for a/t combos that had sold anything in the given year
     df = pd.merge(trades_df, a_t, how='inner', on=['a', 't'])
 
-    df['d'] = pd.to_datetime(df.dt).dt.date
-    realized = df.groupby(['a', 't']).apply(fifo, d).reset_index(name="realized")
+    # df['d'] = pd.to_datetime(df.dt).dt.date
+    realized = df.groupby(['a', 't']).apply(fifo, dt).reset_index(name="realized")
 
     return realized
