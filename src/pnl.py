@@ -20,7 +20,7 @@ def fifo(dfg, dt):
     def realize_q(n, row):
         pnl = 0
         quantity = row.q
-        trade_dt = row['dt']
+        add_pnl = row['dt'] >= dt
         cs = row.cs
         price = row.p
 
@@ -35,7 +35,7 @@ def fifo(dfg, dt):
             else:
                 adj_q = buy_row.q
 
-            if trade_dt > dt:
+            if add_pnl:
                 pnl += cs * adj_q * (price - buy_row.p)
 
             dfg.at[j, 'q'] = buy_row.q - adj_q
@@ -48,6 +48,7 @@ def fifo(dfg, dt):
         return pnl
 
     realized = 0
+    dfg.reset_index(drop=True, inplace=True)
     for i in range(len(dfg)):
         row = dfg.iloc[i]
         if row.q < 0:
@@ -70,6 +71,7 @@ def realized_gains(trades_df, year):
     dt = our_localize(datetime(year, 1, 1))
     sells_df = stocks_sold(trades_df, year)
     a_t = sells_df.loc[:, ['a', 't']]
+    a_t = a_t.drop_duplicates()
 
     # get only trades for a/t combos that had sold anything in the given year
     df = pd.merge(trades_df, a_t, how='inner', on=['a', 't'])

@@ -39,7 +39,7 @@ class FifoTests(unittest.TestCase):
         pnl = realized_gains(df, year)
         expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT2', 'ACCNT2'],
                                  't': ['TICKER1', 'TICKER1', 'TICKER2'],
-                                 'realized': [90.0, 500.0, 105.0]})
+                                 'realized': [90.0, 190.0, 63.0]})
         pd.testing.assert_frame_equal(pnl, expected)
 
 
