@@ -14,9 +14,6 @@ def fifo(dfg, dt):
           b. reduce q for sell and corresponding buy records.
     """
 
-    # mask = (dfg.dt < dt) & (dfg.q > 0.0001)
-    # buys = dfg.where(mask)
-
     def realize_q(n, row):
         pnl = 0
         quantity = row.q
