@@ -15,4 +15,3 @@ class PricesTests(TradesBaseTest):
         df, _ = self.get_df(year=2023, a='ACCNT2', t='TICKER2')
         p = wap(df)
         self.assertAlmostEqual(p, 306.8333333333333)
-
