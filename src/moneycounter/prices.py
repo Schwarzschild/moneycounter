@@ -15,8 +15,8 @@ def remove_closed_out_trades(trades_df):
 
     if total_buy_q > total_sell_q:
         mask = buys_df.q.cumsum() <= total_sell_q
-        delta = buys_df[mask].q.sum()
-        total_sell_q -= delta
+        # delta = buys_df[mask].q.sum()
+        # total_sell_q -= delta
         buys_df = buys_df[~mask]
         buys_df.reset_index(drop=True, inplace=True)
         if len(buys_df):
@@ -24,9 +24,9 @@ def remove_closed_out_trades(trades_df):
         df = buys_df
     elif total_buy_q < total_sell_q:
         mask = sells_df.q.cumsum() <= -total_buy_q
-        delta = sells_df[mask].q.sum()
-        total_buy_q += delta
-        sells_df = sells_df[~mask]
+        # delta = sells_df[mask].q.sum()
+        # total_buy_q += delta
+        sells_df = sells_df[mask]
         sells_df.reset_index(drop=True, inplace=True)
         if len(sells_df):
             sells_df.loc[0, 'q'] += total_buy_q
