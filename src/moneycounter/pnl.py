@@ -1,10 +1,79 @@
 from datetime import date, datetime
 import pandas as pd
+import numpy as np
 from .dt import our_localize
 from .dt import day_start_next_day, day_start
+from .prices import remove_closed_out_trades
 
 
-def fifo(dfg, dt):
+def split_real_unreal(trades_df):
+    """
+    :param trades_df:  Pandas dataframe with single account and ticker
+    :return: (realized, unrealized) profit or loss
+    """
+
+    # Find point to split between realized and unrealized
+    qsum = trades_df.q.cumsum()
+    trades_df['qsum'] = qsum
+
+    s = np.sign(qsum)
+    last_s = s.iloc[-1]
+    mask = s != last_s
+    trades_df['mask'] = mask
+    i = s.where(mask).last_valid_index() + 1
+
+    realized = trades_df[:i + 1]
+    if not realized.empty:
+        q = -qsum.iloc[i - 1]
+        realized.reset_index(drop=True, inplace=True)
+        realized.q.iloc[-1] = q
+
+    unrealized = trades_df[i:]
+    if not unrealized.empty:
+        unrealized.reset_index(drop=True, inplace=True)
+        q = qsum.iloc[i]
+        unrealized.q.iloc[0] = q
+
+    return realized, unrealized
+
+
+def pnl(df, price=0):
+    """
+    Calculate FIFO PnL
+
+    :param df: Pandas dataframe with single account and ticker
+    :param price:     Closing price if there are unrealized trades
+    :return:          realized pnl, unrealized pnl, wap, total
+    """
+    realized, unrealized = split_real_unreal(df)
+
+    if realized.empty:
+        realized_pnl = 0.0
+    else:
+        c = realized.cs[0]
+        realized_pnl = (-realized.q * realized.p).sum() * c
+
+    if unrealized.empty:
+        unrealized_pnl = 0.0
+        wap = 0.0
+    else:
+        c = unrealized.cs[0]
+        pos = unrealized.q.sum()
+        qp_sum = (-unrealized.q * unrealized.p).sum()
+        wap = -qp_sum / pos
+        unrealized_pnl = qp_sum - pos * price
+        unrealized_pnl *= c
+
+    total = realized_pnl + unrealized_pnl
+
+    return realized_pnl, unrealized_pnl, wap, total
+
+####################################################
+
+
+
+
+def fifo_(dfg, dt):
     """
     Calculate realized gains for sells later than d.
     Loop forward from bottom
@@ -53,6 +122,17 @@ def fifo(dfg, dt):
             realized += pnl
 
     return realized
+
+
+def fifo(dfg, dt):
+    first_of_year = day_start(date(dt.year, 1, 1))
+    df = remove_closed_out_trades(dfg[dfg.dt < first_of_year])
+    df = pd.concat([df, dfg[dfg.dt >= first_of_year]])
+
+
+    realized = 0
+    dfg.reset_index(drop=True, inplace=True)
+    t1 = day_start(date(dt.year, 1, 1))
 
 
 def stocks_sold(trades_df, year):

@@ -14,15 +14,20 @@ class FifoTests(TradesBaseTest):
 
     def test_realized(self):
         year = 2022
-        df, _ = self.get_df(year)
+        df, _ = self.get_df(year, a='ACCNT1', t='TICKER3') #  TODO: REMOVE a and t args
         pnl = realized_gains(df, year)
 
         x = [(-20, 300), (10, 301), (-100, 300), (110, 301), (-7, 306), (7, 315)]
-        a1t3 = sum([-i[0] * i[1] for i in x])
+        a1t3 = float(sum([-i[0] * i[1] for i in x]))
 
         expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT1', 'ACCNT2', 'ACCNT2'],
                                  't': ['TICKER1', 'TICKER3', 'TICKER1', 'TICKER2'],
                                  'realized': [90.0, a1t3, 190.0, 63.0]})
+        expected = pd.DataFrame({'a': ['ACCNT1'], 't': ['TICKER3'], 'realized': [a1t3]})
+        print(pnl.to_string())
+        print(pnl.dtypes)
+        print(expected.to_string())
+        print(expected.dtypes)
         pd.testing.assert_frame_equal(pnl, expected)
 
 
