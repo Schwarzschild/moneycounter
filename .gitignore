@@ -3,5 +3,6 @@
 .idea
 __pycache__
 foo.py
-dist
+dist/
+build/
 *.egg-info

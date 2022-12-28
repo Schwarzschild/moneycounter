@@ -4,18 +4,125 @@ from .dt import our_localize
 from .dt import day_start_next_day, day_start
 
 
+def realized_trades(trades_df):
+    """
+    :param df:  Pandas dataframe with single account and ticker.
+    :return: realized_df Pandas dataframe of realized trades.
+    """
+
+    df = trades_df.copy()
+
+    buy_sum = df.where(df.q >= 0).q.sum()
+    sell_sum = -df.where(df.q < 0).q.sum()
+    delta = buy_sum - sell_sum
+
+    # Start
+    if buy_sum == sell_sum:
+        realized_df = df
+    if buy_sum > sell_sum:
+        last_i = df.where(df.q < 0).index[-1]
+        realized_df = df.head(last_i + 1)
+
+        # A short loop to reduce last sell trades by delta
+        for j in range(last_i, -1, -1):
+            rec = realized_df.loc[j]
+            q = rec.q
+            if q > 0:
+                if delta > q:
+                    delta -= q
+                    realized_df.at[j, 'q'] = 0
+                else:
+                    realized_df.at[j, 'q'] -= delta
+                    break
+
+    elif sell_sum > buy_sum:
+        last_i = df.where(df.q >= 0).index[-1]
+        realized_df = df.head(last_i + 1)
+
+        # A short loop to reduce last sell trades by delta
+        for j in range(last_i, -1, -1):
+            rec = realized_df.loc[j]
+            q = rec.q
+            if q < 0:
+                if delta < q:
+                    delta -= q
+                    realized_df.at[j, 'q'] = 0
+                else:
+                    realized_df.at[j, 'q'] -= delta
+                    break
+
+    realized_df.reset_index(drop=True, inplace=True)
+    return realized_df
+
+
+def pnl_calc(df, price=None):
+    '''
+    :param df:  Trades data frame
+    :return: profit or loss
+    '''
+    if df.empty:
+        return 0
+
+    pnl = (-df.q * df.p).sum()
+    if price:
+        pnl += df.q.sum() * price
+
+    cs = df.cs[0]
+    pnl *= cs
+
+    return pnl
+
+
+def pnl(df, price=0):
+    """
+    Calculate FIFO PnL
+
+    :param df: Pandas dataframe with single account and ticker
+    :param price:     Closing price if there are unrealized trades
+    :return:          realized pnl, unrealized pnl, total
+    """
+    realized_df = realized_trades(df)
+    realized_pnl = pnl_calc(realized_df)
+    total = pnl_calc(df, price=price)
+    unrealized_pnl = total - realized_pnl
+
+    return realized_pnl, unrealized_pnl, total
+
+
+def wap_calc(df):
+    '''
+    total based on unrealized trades
+    total = cs * pos * (price - wap)
+    wap = price - total / cs / pos
+
+    :param df: trades
+    :return: wap
+    '''
+
+    if df.empty:
+        return 0.0
+
+    pos = df.q.sum()
+    if pos == 0:
+        return 0.0
+
+    realized_pnl, unrealized_pnl, total = pnl(df)
+    cs = df.cs[0]
+    wap = -unrealized_pnl / cs / pos
+
+    return wap
+
+
 def fifo(dfg, dt):
     """
     Calculate realized gains for sells later than d.
+    THIS ONLY WORKS FOR TRADES ENTERED AS LONG POSITIONS
     Loop forward from bottom
        0. Initialize pnl = 0 (scalar)
        1. everytime we hit a sell
           a. if dfg.dt > dt: calculate and add it to pnl
           b. reduce q for sell and corresponding buy records.
     """
-
-    # mask = (dfg.dt < dt) & (dfg.q > 0.0001)
-    # buys = dfg.where(mask)
 
     def realize_q(n, row):
         pnl = 0
@@ -68,6 +175,9 @@ def stocks_sold(trades_df, year):
 
 
 def realized_gains(trades_df, year):
+    #
+    # Use this to find realized pnl for things sold this year
+    #
     dt = our_localize(datetime(year, 1, 1))
     sells_df = stocks_sold(trades_df, year)
     a_t = sells_df.loc[:, ['a', 't']]
@@ -80,3 +190,18 @@ def realized_gains(trades_df, year):
     realized = df.groupby(['a', 't']).apply(fifo, dt).reset_index(name="realized")
 
     return realized
+
+
+def realized_gains_this_year(trades_df, year):
+    trades_df.reset_index(drop=True, inplace=True)
+    t = day_start(date(year, 1, 1))
+    df = trades_df[trades_df.dt < t]
+    realized_prior, _, _ = pnl(df)
+
+    t = day_start_next_day(date(year, 12, 31))
+    df = trades_df[trades_df.dt < t]
+    realized, _, _ = pnl(df)
+
+    result = realized - realized_prior
+
+    return result

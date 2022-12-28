@@ -1,31 +1,11 @@
-import os
 import unittest
-from datetime import datetime
 import pandas as pd
+from test_base import TradesBaseTest
 from src.moneycounter import fifo, realized_gains
-from src.moneycounter.dt import our_localize
+from src.moneycounter.pnl import realized_gains_this_year
 
 
-class FifoTests(unittest.TestCase):
-    def setUp(self, a=None, t=None):
-        fn = os.path.join(os.path.dirname(__file__), 'trades.csv')
-        df = pd.read_csv(fn, parse_dates=['dt'])
-
-        self.df = df
-
-    def get_df(self, year, a=None, t=None):
-        year = 2022
-        dt = our_localize(datetime(year, 1, 1))
-        eoy = our_localize(datetime(year, 12, 31, 23, 59, 59))
-        # dt = pd.Timestamp(dt, tz='UTC')
-        df = self.df
-        if a is not None:
-            df = df[df.a == a]
-        if t is not None:
-            df = df[df.t == t]
-
-        df = df[df.dt <= eoy]
-        return df, dt
+class FifoTests(TradesBaseTest):
 
     def test_fifo(self):
         year = 2022
@@ -35,13 +15,21 @@ class FifoTests(unittest.TestCase):
 
     def test_realized(self):
         year = 2022
-        df, _ = self.get_df(year)
-        pnl = realized_gains(df, year)
-        expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT2', 'ACCNT2'],
-                                 't': ['TICKER1', 'TICKER1', 'TICKER2'],
-                                 'realized': [90.0, 190.0, 63.0]})
+
+        expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT2', 'ACCNT2'],
+                                 't': ['TICKER1', 'TICKER3', 'TICKER4', 'TICKER5', 'TICKER1', 'TICKER2'],
+                                 'realized': [90.0, -60.0, 0.0, 0.0, 190.00, 63.0]})
+
+        df, _ = self.get_df()
+        pnl = df.groupby(['a', 't']).apply(realized_gains_this_year, year).reset_index(name="realized")
         pd.testing.assert_frame_equal(pnl, expected)
 
-
-if __name__ == '__main__':
-    unittest.main()
+        df, _ = self.get_df(year)
+        pnl = realized_gains(df, year)
+        # TICKER3 starts with a short position and realized_gains() doesn't work in that case
+        pnl = pnl[pnl.t != 'TICKER3']
+        pnl.reset_index(drop=True, inplace=True)
+        # TICKER4 has no trades or position 2022.
+        expected = expected[~expected.t.isin(['TICKER3', 'TICKER4'])]
+        expected.reset_index(drop=True, inplace=True)
+        pd.testing.assert_frame_equal(pnl, expected)
