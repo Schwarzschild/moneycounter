@@ -6,27 +6,29 @@ from .dt import day_start_next_day, day_start
 
 def realized_trades(trades_df):
     """
-    :param trades_df:  Pandas dataframe with single account and ticker.
+    :param df:  Pandas dataframe with single account and ticker.
     :return: realized_df Pandas dataframe of realized trades.
     """
 
-    buy_sum = trades_df.where(trades_df.q >= 0).q.sum()
-    sell_sum = -trades_df.where(trades_df.q < 0).q.sum()
+    df = trades_df.copy()
+
+    buy_sum = df.where(df.q >= 0).q.sum()
+    sell_sum = -df.where(df.q < 0).q.sum()
     delta = buy_sum - sell_sum
 
     # Start
     if buy_sum == sell_sum:
-        realized_df = trades_df
+        realized_df = df
     if buy_sum > sell_sum:
-        last_i = trades_df.where(trades_df.q < 0).index[-1]
-        realized_df = trades_df.head(last_i + 1)
+        last_i = df.where(df.q < 0).index[-1]
+        realized_df = df.head(last_i + 1)
 
         # A short loop to reduce last sell trades by delta
         for j in range(last_i, -1, -1):
             rec = realized_df.loc[j]
             q = rec.q
             if q > 0:
-                if delta < q:
+                if delta > q:
                     delta -= q
                     realized_df.at[j, 'q'] = 0
                 else:
@@ -34,8 +36,8 @@ def realized_trades(trades_df):
                     break
 
     elif sell_sum > buy_sum:
-        last_i = trades_df.where(trades_df.q >= 0).index[-1]
-        realized_df = trades_df.head(last_i + 1)
+        last_i = df.where(df.q >= 0).index[-1]
+        realized_df = df.head(last_i + 1)
 
         # A short loop to reduce last sell trades by delta
         for j in range(last_i, -1, -1):
@@ -62,7 +64,7 @@ def pnl_calc(df, price=None):
 
     pnl = (-df.q * df.p).sum()
     if price:
-        pnl -= df.q.sum() * price
+        pnl += df.q.sum() * price
 
     cs = df.cs[0]
     pnl *= cs
