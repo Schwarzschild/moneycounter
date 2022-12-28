@@ -7,8 +7,6 @@ class PnLTests(TradesBaseTest):
 
     def test_pnl(self):
         year = 2023
-
-
         price = 305
         for a, t, expected_total, expected_realized in [['ACCNT1', 'TICKER4', 460, 10],
                                                         ['ACCNT1', 'TICKER1', 650, 700],
