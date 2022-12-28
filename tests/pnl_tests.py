@@ -14,7 +14,9 @@ class PnLTests(TradesBaseTest):
                                                         ['ACCNT1', 'TICKER1', 650, 700],
                                                         ['ACCNT2', 'TICKER1', 800, 800],
                                                         ['ACCNT2', 'TICKER2', 185, 207],
-                                                        ['ACCNT1', 'TICKER3', -187, -199]]:
+                                                        ['ACCNT1', 'TICKER3', -187, -199],
+                                                        ['ACCNT1', 'TICKER5', -330.0, -330.0]]:
+
             expected_unrealized = expected_total - expected_realized
             df, dt = self.get_df(year, a=a, t=t)
             realized, unrealized, total = pnl(df, price=price)
