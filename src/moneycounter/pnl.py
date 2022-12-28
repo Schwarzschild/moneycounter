@@ -116,6 +116,7 @@ def wap_calc(df):
 def fifo(dfg, dt):
     """
     Calculate realized gains for sells later than d.
+    THIS ONLY WORKS FOR TRADES ENTERED AS LONG POSITIONS
     Loop forward from bottom
        0. Initialize pnl = 0 (scalar)
        1. everytime we hit a sell
@@ -189,3 +190,18 @@ def realized_gains(trades_df, year):
     realized = df.groupby(['a', 't']).apply(fifo, dt).reset_index(name="realized")
 
     return realized
+
+
+def realized_gains_this_year(trades_df, year):
+    trades_df.reset_index(drop=True, inplace=True)
+    t = day_start(date(year, 1, 1))
+    df = trades_df[trades_df.dt < t]
+    realized_prior, _, _ = pnl(df)
+
+    t = day_start_next_day(date(year, 12, 31))
+    df = trades_df[trades_df.dt < t]
+    realized, _, _ = pnl(df)
+
+    result = realized - realized_prior
+
+    return result

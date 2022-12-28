@@ -2,6 +2,7 @@ import unittest
 import pandas as pd
 from test_base import TradesBaseTest
 from src.moneycounter import fifo, realized_gains
+from src.moneycounter.pnl import realized_gains_this_year
 
 
 class FifoTests(TradesBaseTest):
@@ -14,18 +15,21 @@ class FifoTests(TradesBaseTest):
 
     def test_realized(self):
         year = 2022
-        df, _ = self.get_df(year)
-        pnl = realized_gains(df, year)
 
-        expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT2', 'ACCNT2'],
-                                 't': ['TICKER1', 'TICKER3', 'TICKER5', 'TICKER1', 'TICKER2'],
-                                 'realized': [90.0, 60.0, 0.0, 190.00, 63.0]})
-        print(pnl.to_string())
-        print(pnl.dtypes)
-        print(expected.to_string())
-        print(expected.dtypes)
+        expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT2', 'ACCNT2'],
+                                 't': ['TICKER1', 'TICKER3', 'TICKER4', 'TICKER5', 'TICKER1', 'TICKER2'],
+                                 'realized': [90.0, -60.0, 0.0, 0.0, 190.00, 63.0]})
+
+        df, _ = self.get_df()
+        pnl = df.groupby(['a', 't']).apply(realized_gains_this_year, year).reset_index(name="realized")
         pd.testing.assert_frame_equal(pnl, expected)
 
-
-if __name__ == '__main__':
-    unittest.main()
+        df, _ = self.get_df(year)
+        pnl = realized_gains(df, year)
+        # TICKER3 starts with a short position and realized_gains() doesn't work in that case
+        pnl = pnl[pnl.t != 'TICKER3']
+        pnl.reset_index(drop=True, inplace=True)
+        # TICKER4 has no trades or position 2022.
+        expected = expected[~expected.t.isin(['TICKER3', 'TICKER4'])]
+        expected.reset_index(drop=True, inplace=True)
+        pd.testing.assert_frame_equal(pnl, expected)
