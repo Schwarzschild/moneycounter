@@ -51,6 +51,7 @@ def realized_trades(trades_df):
                     realized_df.at[j, 'q'] -= delta
                     break
 
+    realized_df.reset_index(drop=True, inplace=True)
     return realized_df
 
 
@@ -86,6 +87,30 @@ def pnl(df, price=0):
     unrealized_pnl = total - realized_pnl
 
     return realized_pnl, unrealized_pnl, total
+
+
+def wap_calc(df):
+    '''
+    total based on unrealized trades
+    total = cs * pos * (price - wap)
+    wap = price - total / cs / pos
+
+    :param df: trades
+    :return: wap
+    '''
+
+    if df.empty:
+        return 0.0
+
+    pos = df.q.sum()
+    if pos == 0:
+        return 0.0
+
+    realized_pnl, unrealized_pnl, total = pnl(df)
+    cs = df.cs[0]
+    wap = -unrealized_pnl / cs / pos
+
+    return wap
 
 
 def fifo(dfg, dt):

@@ -1,6 +1,6 @@
-
+import pandas as pd
 from test_base import TradesBaseTest
-from src.moneycounter.pnl import pnl
+from src.moneycounter.pnl import pnl, wap_calc
 
 
 class PnLTests(TradesBaseTest):
@@ -22,3 +22,12 @@ class PnLTests(TradesBaseTest):
             self.assertAlmostEqual(realized, expected_realized)
             self.assertAlmostEqual(unrealized, expected_unrealized)
             self.assertAlmostEqual(total, expected_total)
+
+    def test_wap(self):
+        df, dt = self.get_df()
+        expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT2', 'ACCNT2'],
+                                 't': ['TICKER1', 'TICKER3', 'TICKER4', 'TICKER5', 'TICKER1', 'TICKER2'],
+                                 'wap': [308.5, 307.0, 300.0, 300.0, 307.0, 306.769]})
+
+        wap = df.groupby(['a', 't']).apply(lambda x: wap_calc(x.reset_index())).reset_index(name="wap")
+        pd.testing.assert_frame_equal(wap, expected)
