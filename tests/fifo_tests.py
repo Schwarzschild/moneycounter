@@ -21,7 +21,7 @@ class FifoTests(TradesBaseTest):
                                  'realized': [90.0, -60.0, 0.0, 0.0, 190.00, 63.0]})
 
         df, _ = self.get_df()
-        pnl = df.groupby(['a', 't']).apply(realized_gains, year).reset_index(name="realized")
+        pnl = realized_gains(df, year)
         pd.testing.assert_frame_equal(pnl, expected)
 
         df, _ = self.get_df(year)

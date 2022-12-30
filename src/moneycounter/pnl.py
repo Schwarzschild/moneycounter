@@ -192,7 +192,7 @@ def realized_gains_fifo(trades_df, year):
     return realized
 
 
-def realized_gains(trades_df, year):
+def realized_gains_one(trades_df, year):
     trades_df.reset_index(drop=True, inplace=True)
     t = day_start(date(year, 1, 1))
     df = trades_df[trades_df.dt < t]
@@ -205,3 +205,8 @@ def realized_gains(trades_df, year):
     result = realized - realized_prior
 
     return result
+
+
+def realized_gains(trades_df, year):
+    pnl = trades_df.groupby(['a', 't']).apply(realized_gains_one, year).reset_index(name="realized")
+    return pnl
