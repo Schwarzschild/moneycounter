@@ -207,6 +207,27 @@ def realized_gains_one(trades_df, year):
     return result
 
 
+def stocks_traded(trades_df, year):
+    # Find any stock sells this year
+    t1 = day_start(date(year, 1, 1))
+    t2 = day_start_next_day(date(year, 12, 31))
+    mask = (trades_df['dt'] >= t1) & (trades_df['dt'] < t2)
+    sells_df = trades_df.loc[mask]
+    return sells_df
+
+
 def realized_gains(trades_df, year):
-    pnl = trades_df.groupby(['a', 't']).apply(realized_gains_one, year).reset_index(name="realized")
+    sells_df = stocks_traded(trades_df, year)
+    a_t = sells_df.loc[:, ['a', 't']]
+    a_t = a_t.drop_duplicates()
+
+    # get only trades for a/t combos that had sold anything in the given year
+    df = pd.merge(trades_df, a_t, how='inner', on=['a', 't'])
+
+    pnl = df.groupby(['a', 't']).apply(realized_gains_one, year).reset_index(name="realized")
+
+    # Eliminate zeros
+    pnl = pnl.loc[pnl.realized != 0]
+    pnl.reset_index(drop=True, inplace=True)
+
     return pnl
