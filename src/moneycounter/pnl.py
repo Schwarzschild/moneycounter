@@ -174,7 +174,7 @@ def stocks_sold(trades_df, year):
     return sells_df
 
 
-def realized_gains(trades_df, year):
+def realized_gains_fifo(trades_df, year):
     #
     # Use this to find realized pnl for things sold this year
     #
@@ -192,7 +192,7 @@ def realized_gains(trades_df, year):
     return realized
 
 
-def realized_gains_this_year(trades_df, year):
+def realized_gains(trades_df, year):
     trades_df.reset_index(drop=True, inplace=True)
     t = day_start(date(year, 1, 1))
     df = trades_df[trades_df.dt < t]
