@@ -2,6 +2,7 @@ from datetime import date, datetime
 import pandas as pd
 from .dt import our_localize
 from .dt import day_start_next_day, day_start
+from .str_utils import is_near_zero
 
 
 def realized_trades(trades_df):
@@ -87,6 +88,52 @@ def pnl(df, price=0):
     unrealized_pnl = total - realized_pnl
 
     return realized_pnl, unrealized_pnl, total
+
+
+def wap_old(data):
+    """
+    weighted_average_price(t, a) - query db values q,p and calculate wap
+    get_balances(d, a, t) - query trades and cash,  calculate cash realized contributions, balances[k]=v
+    valuations(d, account, ticker) - use get_balances() for query - for each pos get price and value it.
+
+    These two functions get everything even if pos is zero or no trades in date range.
+    get_futures_pnl(a, d) - query trade sums and return [[t, p, pos, pnl]], total
+    get_equities_pnl(a, d) - same as get_futures_pnl but just equities
+    """
+
+    n = len(data)
+
+    #  close out lifo trades
+    for i in range(1, n):
+        (q, p) = data[i]
+        for j in range(i - 1, -1, -1):
+            q2 = data[j][0]
+            if q * q2 >= 0.0:
+                continue
+            if abs(q) <= abs(q2):
+                q2 += q
+                q = 0
+            else:
+                q += q2
+                q2 = 0
+            data[j][0] = q2
+            if is_near_zero(q):
+                break
+        data[i][0] = q
+
+    # Calculate WAP
+    pqsum = 0.0
+    qsum = 0.0
+    for x in data:
+        (q, p) = x
+        pqsum += p * q
+        qsum += q
+
+    if 0 == is_near_zero(qsum):
+        wap = pqsum / qsum
+    else:
+        wap = 0.0
+    return qsum, wap
 
 
 def wap_calc(df):
