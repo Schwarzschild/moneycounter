@@ -1,6 +1,8 @@
 # Money Counter
 *Portfolio analytics utilities*
 
+
+
 This is the beginning of a work in progress.
 I expect it will be in pretty good shape early in
 2023 and then evolve from there.
@@ -8,6 +10,8 @@ I expect it will be in pretty good shape early in
 This is a supporting package for a larger project I am working on and should be useful to others as is.
 
 ### Installation
+
+[PyPI Page](https://pypi.org/search/?q=moneycounter)
 
 ```shell
 $ pip install moneycounter 
