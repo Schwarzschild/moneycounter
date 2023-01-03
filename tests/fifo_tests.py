@@ -35,3 +35,9 @@ class FifoTests(TradesBaseTest):
         expected = expected[~expected.t.isin(['TICKER3', 'TICKER4'])]
         expected.reset_index(drop=True, inplace=True)
         pd.testing.assert_frame_equal(pnl, expected)
+
+    def test_realized_none(self):
+        year = 2025
+        df, _ = self.get_df()
+        pnl = realized_gains(df, year)
+        self.assertTrue(pnl.empty)

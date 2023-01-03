@@ -271,10 +271,13 @@ def realized_gains(trades_df, year):
     # get only trades for a/t combos that had sold anything in the given year
     df = pd.merge(trades_df, a_t, how='inner', on=['a', 't'])
 
-    pnl = df.groupby(['a', 't']).apply(realized_gains_one, year).reset_index(name="realized")
+    if df.empty:
+        pnl = pd.DataFrame(columns=['a', 't', 'realized'])
+    else:
+        pnl = df.groupby(['a', 't']).apply(realized_gains_one, year).reset_index(name="realized")
 
-    # Eliminate zeros
-    pnl = pnl.loc[pnl.realized != 0]
-    pnl.reset_index(drop=True, inplace=True)
+        # Eliminate zeros
+        pnl = pnl.loc[pnl.realized != 0]
+        pnl.reset_index(drop=True, inplace=True)
 
     return pnl
