@@ -68,7 +68,7 @@ def pnl_calc(df, price=None):
     if price:
         pnl += df.q.sum() * price
 
-    cs = df.cs[0]
+    cs = df.cs.iloc[0]
     pnl *= cs
 
     return pnl
@@ -154,7 +154,7 @@ def wap_calc(df):
         return 0.0
 
     realized_pnl, unrealized_pnl, total = pnl(df)
-    cs = df.cs[0]
+    cs = df.cs.iloc[0]
     wap = -unrealized_pnl / cs / pos
 
     return wap
