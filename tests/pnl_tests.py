@@ -24,19 +24,24 @@ class PnLTests(TradesBaseTest):
             self.assertAlmostEqual(total, expected_total)
 
     def test_wap(self):
-        df, dt = self.get_df()
-        expected = pd.DataFrame({'a': ['ACCNT1', 'ACCNT1', 'ACCNT1', 'ACCNT1',
-                                       'ACCNT2', 'ACCNT2', 'ACCNT3', 'ACCNT4'],
-                                 't': ['TICKER1', 'TICKER3', 'TICKER4', 'TICKER5',
-                                       'TICKER1', 'TICKER2', 'TICKER6', 'TICKER6'],
-                                 'wap': [307.6667, 306.5, 300.0, 300.0,
-                                         300.5909, 306.5, 23.75, 291.1494]})
 
-        wap = df.groupby(['a', 't']).apply(lambda x: wap_calc(x.reset_index())).reset_index(name="wap")
-        print(f"Wap = {wap}")
-        pd.testing.assert_frame_equal(wap, expected)
+        for a, t in (('ACCNT1', 'TICKER1'),
+                     ('ACCNT1', 'TICKER3'),
+                     ('ACCNT1', 'TICKER4'),
+                     ('ACCNT1', 'TICKER5'),
+                     ('ACCNT2', 'TICKER1'),
+                     ('ACCNT2', 'TICKER2'),
+                     ('ACCNT3', 'TICKER6'),
+                     ('ACCNT4', 'TICKER6')):
 
-    def test_wap_with_split(self):
-        df, dt = self.get_df(2022, a='ACCNT3', t='TICKER6')
-        wap = wap_calc(df)
-        self.assertAlmostEqual(wap, 23.75, places=4)
+            df, _ = self.get_df(a=a, t=t)
+
+            position = df.q.sum()
+
+            _, pl_expected, _ = pnl(df, 1.0)
+
+            wap = wap_calc(df)
+
+            pl_calculated = position * (1.0 - wap)
+
+            self.assertAlmostEqual(pl_expected, pl_calculated)
