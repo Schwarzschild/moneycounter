@@ -92,76 +92,6 @@ def pnl(df, price=0):
     return realized_pnl, unrealized_pnl, total
 
 
-# def wap_old(data):
-#     """
-#     weighted_average_price(t, a) - query db values q,p and calculate wap
-#     get_balances(d, a, t) - query trades and cash,  calculate cash realized contributions, balances[k]=v
-#     valuations(d, account, ticker) - use get_balances() for query - for each pos get price and value it.
-#
-#     These two functions get everything even if pos is zero or no trades in date range.
-#     get_futures_pnl(a, d) - query trade sums and return [[t, p, pos, pnl]], total
-#     get_equities_pnl(a, d) - same as get_futures_pnl but just equities
-#     """
-#
-#     n = len(data)
-#
-#     #  close out lifo trades
-#     for i in range(1, n):
-#         (q, p) = data[i]
-#         for j in range(i - 1, -1, -1):
-#             q2 = data[j][0]
-#             if q * q2 >= 0.0:
-#                 continue
-#             if abs(q) <= abs(q2):
-#                 q2 += q
-#                 q = 0
-#             else:
-#                 q += q2
-#                 q2 = 0
-#             data[j][0] = q2
-#             if is_near_zero(q):
-#                 break
-#         data[i][0] = q
-#
-#     # Calculate WAP
-#     pqsum = 0.0
-#     qsum = 0.0
-#     for x in data:
-#         (q, p) = x
-#         pqsum += p * q
-#         qsum += q
-#
-#     if 0 == is_near_zero(qsum):
-#         wap = pqsum / qsum
-#     else:
-#         wap = 0.0
-#     return qsum, wap
-
-
-# def wap_calc_first_attempt(df, price):
-#     '''
-#     total based on unrealized trades
-#     total = cs * pos * (price - wap)
-#     wap = price - total / cs / pos
-#
-#     :param df: trades
-#     :return: wap
-#     '''
-#
-#     if df.empty:
-#         return 0.0
-#
-#     pos = df.q.sum()
-#     if pos == 0:
-#         return 0.0
-#
-#     realized_pnl, unrealized_pnl, total = pnl(df, price=price)
-#     cs = df.cs.iloc[0]
-#     wap = -unrealized_pnl / cs / pos
-#
-#     return wap
-
-
 def remove_old_trades(df):
     """
     Remove all trades before the last time the position changed sign.
@@ -170,8 +100,8 @@ def remove_old_trades(df):
     :param df:
     :return:
     """
-    df['qsum'] = df.q.cumsum()
-    pos = df.qsum.iat[-1]
+    qsum = df.q.cumsum()
+    pos = qsum.iat[-1]
 
     if is_near_zero(pos):
         df = df.head(0)
@@ -179,35 +109,46 @@ def remove_old_trades(df):
         try:
             # Eliminate all rows since the last time the pos was negative.
             if pos > 0:
-                i = df[df.qsum <= 0][-1:].index[0]
+                i = df[qsum <= 0][-1:].index[0]
             else:
-                i = df[df.qsum >= 0][-1:].index[0]
+                i = df[qsum >= 0][-1:].index[0]
 
-            if is_near_zero(df.qsum[i]):
+            if is_near_zero(qsum[i]):
                 i += 1
 
             df = df[i:]
             df.reset_index(drop=True, inplace=True)
 
-            df.loc[0].q = df.qsum[0]
+            qsum = qsum[i:]
+
+            # df.loc[0, 'q'] = df.loc[0, 'qsum']
+            df.loc[0, 'q'] = qsum.iat[0]
         except IndexError:
             # Nothing to eliminate
             pass
-
-        df = df.drop(columns='qsum', axis=1)
 
     return df
 
 
 def wap_calc(df):
     """
-
-    Equivalent entry price given the current position was acquired at once.
-    Should work for short position too.
-    Formula: cost_basis / position
+    Calculated the Weighted Average Price
+    Assumption: df is in chronological order.
 
     :param df:
     :return wap:
+
+    Calculate equivalent entry price for the current position such that the
+    PnL can be calculated with this formula:
+
+    PnL = position * contract_size * (price - wap)
+
+    where:
+        position is the current position
+        contract_size is the number of shares per contract, typically 1 for stocks
+        price is the current price
+        wap is the weighted average price calculated by this method.
+
 
     """
 
@@ -215,25 +156,10 @@ def wap_calc(df):
     if is_near_zero(position):
         return 0.0
 
-    df = df[['q', 'p']].copy()
+    df = df[['q', 'p', 'cs']]
     df = remove_old_trades(df)
-
-    # Eliminate all trades before last
-
-    pos_flags = df.q >= 0
-    if position > 0:
-        # Remove negative trades
-        df = df[pos_flags]
-    else:
-        # Remove positive trades
-        df = df[~pos_flags]
-
-    df.reset_index(drop=True, inplace=True)
-
-    qp = df.q.dot(df.p)
-    qsum = df.q.sum()
-
-    wap = abs(qp / qsum)
+    _, pl, _ = pnl(df, price=1.0)
+    wap = 1.0 - pl / position
 
     return wap
 

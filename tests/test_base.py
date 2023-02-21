@@ -24,4 +24,5 @@ class TradesBaseTest(unittest.TestCase):
 
         df = df[df.dt <= eoy]
         df.reset_index(drop=True, inplace=True)
+        df = df.sort_values(by=['dt'], ascending=True, ignore_index=True)
         return df, dt
