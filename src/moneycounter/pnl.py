@@ -156,10 +156,11 @@ def wap_calc(df):
     if is_near_zero(position):
         return 0.0
 
+    cs = df.loc[0, 'cs']
     df = df[['q', 'p', 'cs']]
     df = remove_old_trades(df)
     _, pl, _ = pnl(df, price=1.0)
-    wap = 1.0 - pl / position
+    wap = 1.0 - pl / position / cs
 
     return wap
 
