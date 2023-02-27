@@ -64,7 +64,7 @@ def pnl_calc(df, price=None):
     if df.empty:
         return 0
 
-    pnl = (-df.q * df.p).sum()
+    pnl = -(df.q * df.p).sum()
     if price:
         pnl += df.q.sum() * price
 
@@ -90,6 +90,95 @@ def pnl(df, price=0):
     unrealized_pnl = total - realized_pnl
 
     return realized_pnl, unrealized_pnl, total
+
+
+def divide_trades(df):
+    """
+    Return two dataframes: 1. realized trades; and 2. unrealized trades.
+
+    :param df:
+    :return realized_df, unrealized_df:
+
+     Scenario 1
+     q     csum   realized    unrealized
+    +2      2        2            0
+    -2      0       -2            0
+    +10    10        6            4
+    -5      5       -5            0
+    +2      7        0            2
+    +1      8        0            1
+    -1      7       -1            0
+
+    Scenario 2
+     q     csum   realized    unrealized
+    +10    10       10            0
+    -5      5       -5            0
+    -7     -2       -6           -1
+    +1     -1        1            0
+    -1     -2        0           -1
+
+    [Everything up to the csum sign change is realized]
+    [The -6 realized is a sum of -7 and any positive q's after it]
+    [Any buys are also realized]
+    [Any sells are unrealized]
+
+    Find location, i, of last sign change
+
+    """
+    qsum = df.q.cumsum()
+    pos = qsum.iat[-1]
+
+    if is_near_zero(pos):
+        unrealized_df = df.head(0)
+        realized_df = df
+    else:
+        # Find all rows since the last time the pos changed sign.
+        if pos > 0:
+            flags = qsum <= 0
+        else:
+            flags = qsum >= 0
+
+        i = df.index[0]
+        if flags.any():
+            i = df[flags][-1:].index[0]
+
+        if pos > 0:
+            flags = df.q < 0
+        else:
+            flags = df.q > 0
+
+        q_adj = df[flags][i:].q.sum()
+
+        realized_df = df.copy()
+        realized_df.loc[i, 'q'] -= q_adj
+        flags[:i] = False
+        realized_df.loc[flags, 'q'] = 0
+
+
+        # ... up to here ...
+
+        if is_near_zero(qsum[i]):
+            i += 1
+
+        try:
+            realized_df = df[:i]
+            x = realized_df.q.sum()
+            realized_df.q.iloc[-1] -= x
+        except IndexError:
+            realized_df = df.head(0)
+
+        try:
+            unrealized_df = df[i:]
+            unrealized_df.reset_index(drop=True, inplace=True)
+
+            qsum = qsum[i:]
+            x = qsum[i]
+
+            unrealized_df.loc[0, 'q'] = qsum.iat[0]
+        except IndexError:
+            unrealized_df = df.head(0)
+
+    return realized_df, unrealized_df
 
 
 def remove_old_trades(df):
