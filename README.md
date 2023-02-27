@@ -52,6 +52,4 @@ wap = wap_calc(df)
 # Calculate realized gains from trades data frame.
 realized = realized_gains(df)
 
-$ \phi = c * Q * (p - p_wap) $
-
-```
+$` \phi = c * Q * (p - p_wap) `$
