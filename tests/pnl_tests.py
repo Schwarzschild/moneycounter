@@ -1,4 +1,4 @@
-import pandas as pd
+
 from test_base import TradesBaseTest
 from src.moneycounter.pnl import pnl, divide_trades, wap_calc
 
@@ -28,7 +28,7 @@ class PnLTests(TradesBaseTest):
         expected_realized_q = [2, -2, 6, -5, 0, 0 - 1]
         expected_unrealized_q = [4, 0, 2, 1, 0]
 
-        df, _ = self.get_df(a='ACCNT5', t='TICKER7')
+        df, _ = self.get_df(a='ACCNT5', t='CASE4')
         realized_df, unrealized_df = divide_trades(df)
         realized_df_q = list(realized_df.q)
         unrealized_df_q = list(unrealized_df.q)
@@ -37,7 +37,6 @@ class PnLTests(TradesBaseTest):
         self.assertListEqual(unrealized_df_q, expected_unrealized_q)
 
         # df, _ = self.get_df(a='ACCNT5', t='TICKER8')
-
 
     def test_wap(self):
 

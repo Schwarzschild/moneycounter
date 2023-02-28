@@ -92,6 +92,31 @@ def pnl(df, price=0):
     return realized_pnl, unrealized_pnl, total
 
 
+def find_sign_change(df, csum=None):
+    """
+    Calculate csum and find the last sign change.
+
+    :param df:
+    :return:
+    """
+
+    if csum is None:
+        csum = df.q.cumsum()
+
+    pos = csum.iat[-1]
+
+    if pos > 0:
+        flags = csum <= 0
+    else:
+        flags = csum >= 0
+
+    i = df.index[0]
+    if flags.any():
+        i = df[flags][-1:].index[0] + 1
+
+    return csum, pos, i
+
+
 def divide_trades(df):
     """
     Return two dataframes: 1. realized trades; and 2. unrealized trades.
@@ -99,7 +124,7 @@ def divide_trades(df):
     :param df:
     :return realized_df, unrealized_df:
 
-     Scenario 1
+    Case 1
      q     csum   realized    unrealized
     +2      2        2            0
     -2      0       -2            0
@@ -109,74 +134,71 @@ def divide_trades(df):
     +1      8        0            1
     -1      7       -1            0
 
-    Scenario 2
+    Case 2
+    +2      2        0            2
+
+    Case 3
      q     csum   realized    unrealized
     +10    10       10            0
     -5      5       -5            0
-    -7     -2       -6           -1
-    +1     -1        1            0
-    -1     -2        0           -1
+    -20   -15       -6          -14
+    +1    -14        1            0
+    -2    -16        0           -2
+    +5    -11        5            0
 
-    [Everything up to the csum sign change is realized]
-    [The -6 realized is a sum of -7 and any positive q's after it]
-    [Any buys are also realized]
-    [Any sells are unrealized]
+    Case 4
+         q     csum   realized    unrealized
+        +10    10       10            0
+        -5      5       -5            0
+     i -11     -6       -11           0
+        -4    -10       -4            0
+        -5    -15       -2           -3
+       +12     -3       12            0
+        -1     -4        0           -1
 
-    Find location, i, of last sign change
+    To find unrealized:
+
+    Copy df to df_unrealized
+    Find i at last csum sign change
+    Set all q before i to zero
+    Let Q_pos = sum(positive trades after i), or negative values if position is positive.
+    Set all positive q after i to zero
+    Find csum
+    Subtract Q from all csum entries
+    Set q at i to csum at i: i.e. the -5 becomes a -3
+
+    df_realized = df - df_unrealized
+
+    Remove all records where q=0 from both df_realized and df_unrealized
 
     """
-    qsum = df.q.cumsum()
-    pos = qsum.iat[-1]
+    pos = df.q.sum()
 
     if is_near_zero(pos):
         unrealized_df = df.head(0)
         realized_df = df
     else:
-        # Find all rows since the last time the pos changed sign.
-        if pos > 0:
-            flags = qsum <= 0
+
+        unrealized_df = df.copy()
+        csum, pos, i = find_sign_change(df)
+        unrealized_df.q[:i] = 0
+        flags = unrealized_df.q > 0
+        if pos >= 0:
+            q_neg = unrealized_df[flags].q.sum()
+            unrealized_df[flags].q = 0
+            unrealized_df[~flags].q -= q_neg
         else:
-            flags = qsum >= 0
+            q_pos = unrealized_df[~flags].q.sum()
+            unrealized_df[~flags].q = 0
+            unrealized_df[flags].q -= q_pos
 
-        i = df.index[0]
-        if flags.any():
-            i = df[flags][-1:].index[0]
-
-        if pos > 0:
-            flags = df.q < 0
-        else:
-            flags = df.q > 0
-
-        q_adj = df[flags][i:].q.sum()
+        unrealized_df.loc[i, 'q'] = csum.iat[i]
 
         realized_df = df.copy()
-        realized_df.loc[i, 'q'] -= q_adj
-        flags[:i] = False
-        realized_df.loc[flags, 'q'] = 0
+        realized_df.q = df.q - unrealized_df.q
 
-
-        # ... up to here ...
-
-        if is_near_zero(qsum[i]):
-            i += 1
-
-        try:
-            realized_df = df[:i]
-            x = realized_df.q.sum()
-            realized_df.q.iloc[-1] -= x
-        except IndexError:
-            realized_df = df.head(0)
-
-        try:
-            unrealized_df = df[i:]
-            unrealized_df.reset_index(drop=True, inplace=True)
-
-            qsum = qsum[i:]
-            x = qsum[i]
-
-            unrealized_df.loc[0, 'q'] = qsum.iat[0]
-        except IndexError:
-            unrealized_df = df.head(0)
+        realized_df = realized_df[realized_df.q != 0]
+        unrealized_df = unrealized_df[unrealized_df.q != 0]
 
     return realized_df, unrealized_df
 
