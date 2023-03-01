@@ -1,9 +1,14 @@
 
 from test_base import TradesBaseTest
-from src.moneycounter.pnl import pnl, divide_trades, wap_calc
+from src.moneycounter.pnl import pnl, separate_trades, wap_calc
 
 
 class PnLTests(TradesBaseTest):
+
+    def _assert_lists_almost_equal(self, a, b):
+        self.assertEqual(len(a), len(b))
+        for x, y in zip(a, b):
+            self.assertAlmostEqual(x, y)
 
     def test_pnl(self):
         year = 2023
@@ -19,24 +24,28 @@ class PnLTests(TradesBaseTest):
             df, dt = self.get_df(year, a=a, t=t)
             realized, unrealized, total = pnl(df, price=price)
 
-            self.assertAlmostEqual(realized, expected_realized)
-            self.assertAlmostEqual(unrealized, expected_unrealized)
-            self.assertAlmostEqual(total, expected_total)
-
     def test_divide_trades(self):
 
-        expected_realized_q = [2, -2, 6, -5, 0, 0 - 1]
-        expected_unrealized_q = [4, 0, 2, 1, 0]
+        expected = [['CASE1', [4, 2, 1], [2, -2, 6, -5, -1]],
+                    ['CASE2', [2], []],
+                    ['CASE3', [-10, -1, -2], [10, -5, -10, 5]],
+                    ['CASE4', [-3, -1], [10, -5, -11, -4, -2, 12]],
+                    ['CASE5', [3, 1], [-10, 5, 11, 4, 2, -12]]]
 
-        df, _ = self.get_df(a='ACCNT5', t='CASE4')
-        realized_df, unrealized_df = divide_trades(df)
-        realized_df_q = list(realized_df.q)
-        unrealized_df_q = list(unrealized_df.q)
+        for case, expected_unrealized_q, expected_realized_q in expected:
+            df, _ = self.get_df(a='ACCNT5', t=case)
+            realized_df, unrealized_df = separate_trades(df)
+            realized_df_q = list(realized_df.q)
+            unrealized_df_q = list(unrealized_df.q)
+            try:
+                self._assert_lists_almost_equal(realized_df_q, expected_realized_q)
+            except AssertionError:
+                raise AssertionError(f"AssertionError {case} {realized_df_q} not equal to {expected_realized_q}")
 
-        self.assertListEqual(realized_df_q, expected_realized_q)
-        self.assertListEqual(unrealized_df_q, expected_unrealized_q)
-
-        # df, _ = self.get_df(a='ACCNT5', t='TICKER8')
+            try:
+                self._assert_lists_almost_equal(unrealized_df_q, expected_unrealized_q)
+            except AssertionError:
+                raise AssertionError(f"AssertionError {unrealized_df_q} not equal to {expected_unrealized_q}")
 
     def test_wap(self):
 

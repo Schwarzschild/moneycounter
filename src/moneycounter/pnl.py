@@ -117,7 +117,7 @@ def find_sign_change(df, csum=None):
     return csum, pos, i
 
 
-def divide_trades(df):
+def separate_trades(df):
     """
     Return two dataframes: 1. realized trades; and 2. unrealized trades.
 
@@ -147,25 +147,30 @@ def divide_trades(df):
     +5    -11        5            0
 
     Case 4
-         q     csum   realized    unrealized
-        +10    10       10            0
-        -5      5       -5            0
-     i -11     -6       -11           0
-        -4    -10       -4            0
-        -5    -15       -2           -3
-       +12     -3       12            0
-        -1     -4        0           -1
+         q     csum        q    csum       unrealized_q   realized_q
+        +10    10          0     0            0              10
+        -5      5          0     0            0              -5
+     i -11     -6         -6    -6            0             -11
+        -4    -10     =>  -4    -10     =>    0              -4
+        -5    -15         -5    -15          -3              -2
+       +12     -3          0    -15           0              12
+        -1     -4         -1    -16          -1               0
+                         q_pos = 12
 
     To find unrealized:
+      Step 1
+            Copy df to df_unrealized
+            Find i at last csum sign change
+            Set all q before i to zero
+            Set q[i] = csum[i]
 
-    Copy df to df_unrealized
-    Find i at last csum sign change
-    Set all q before i to zero
-    Let Q_pos = sum(positive trades after i), or negative values if position is positive.
-    Set all positive q after i to zero
-    Find csum
-    Subtract Q from all csum entries
-    Set q at i to csum at i: i.e. the -5 becomes a -3
+      Step 2
+            q_pos = q[q > 0].sum()    Get sum of positive trades.
+            Set q[q > 0] = 0          Zero out all positive trades.
+            find csum
+            Find first time csum <= -q_pos at j
+            q[j] = csum[j] + q_pos
+
 
     df_realized = df - df_unrealized
 
@@ -178,21 +183,35 @@ def divide_trades(df):
         unrealized_df = df.head(0)
         realized_df = df
     else:
-
+        # Step 1
         unrealized_df = df.copy()
         csum, pos, i = find_sign_change(df)
-        unrealized_df.q[:i] = 0
-        flags = unrealized_df.q > 0
-        if pos >= 0:
-            q_neg = unrealized_df[flags].q.sum()
-            unrealized_df[flags].q = 0
-            unrealized_df[~flags].q -= q_neg
-        else:
-            q_pos = unrealized_df[~flags].q.sum()
-            unrealized_df[~flags].q = 0
-            unrealized_df[flags].q -= q_pos
+        unrealized_df.loc[:i, 'q'] = 0
+        unrealized_df.loc[i, 'q'] = csum.loc[i]
 
-        unrealized_df.loc[i, 'q'] = csum.iat[i]
+        # Step 2
+        if pos >= 0:
+            flags = unrealized_df.q < 0
+            q_neg = unrealized_df[flags].q.sum()
+            unrealized_df.loc[flags, 'q'] = 0
+
+            csum = unrealized_df.q.cumsum()
+            flags = csum >= -q_neg
+            i = csum[flags].index[0]
+
+            unrealized_df.loc[:i, 'q'] = 0
+            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_neg
+        else:
+            flags = unrealized_df.q > 0
+            q_pos = unrealized_df[flags].q.sum()
+            unrealized_df.loc[flags, 'q'] = 0
+
+            csum = unrealized_df.q.cumsum()
+            flags = csum <= -q_pos
+            i = csum[flags].index[0]
+
+            unrealized_df.loc[:i, 'q'] = 0
+            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_pos
 
         realized_df = df.copy()
         realized_df.q = df.q - unrealized_df.q
