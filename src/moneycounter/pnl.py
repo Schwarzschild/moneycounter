@@ -155,7 +155,7 @@ def separate_trades(df):
         -5    -15         -5    -15          -3              -2
        +12     -3          0    -15           0              12
         -1     -4         -1    -16          -1               0
-                         q_pos = 12
+                         q_sum = 12
 
     To find unrealized:
       Step 1
@@ -165,11 +165,11 @@ def separate_trades(df):
             Set q[i] = csum[i]
 
       Step 2
-            q_pos = q[q > 0].sum()    Get sum of positive trades.
+            q_sum = q[q > 0].sum()    Get sum of positive trades.
             Set q[q > 0] = 0          Zero out all positive trades.
             find csum
-            Find first time csum <= -q_pos at j
-            q[j] = csum[j] + q_pos
+            Find first time csum <= -q_sum at j
+            q[j] = csum[j] + q_sum
 
 
     df_realized = df - df_unrealized
@@ -192,26 +192,26 @@ def separate_trades(df):
         # Step 2
         if pos >= 0:
             flags = unrealized_df.q < 0
-            q_neg = unrealized_df[flags].q.sum()
+            q_sum = unrealized_df[flags].q.sum()
             unrealized_df.loc[flags, 'q'] = 0
 
             csum = unrealized_df.q.cumsum()
-            flags = csum >= -q_neg
+            flags = csum >= -q_sum
             i = csum[flags].index[0]
 
             unrealized_df.loc[:i, 'q'] = 0
-            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_neg
+            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_sum
         else:
             flags = unrealized_df.q > 0
-            q_pos = unrealized_df[flags].q.sum()
+            q_sum = unrealized_df[flags].q.sum()
             unrealized_df.loc[flags, 'q'] = 0
 
             csum = unrealized_df.q.cumsum()
-            flags = csum <= -q_pos
+            flags = csum <= -q_sum
             i = csum[flags].index[0]
 
             unrealized_df.loc[:i, 'q'] = 0
-            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_pos
+            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_sum
 
         realized_df = df.copy()
         realized_df.q = df.q - unrealized_df.q
@@ -222,75 +222,15 @@ def separate_trades(df):
     return realized_df, unrealized_df
 
 
-def remove_old_trades(df):
-    """
-    Remove all trades before the last time the position changed sign.
-
-
-    :param df:
-    :return:
-    """
-    qsum = df.q.cumsum()
-    pos = qsum.iat[-1]
-
-    if is_near_zero(pos):
-        df = df.head(0)
-    else:
-        try:
-            # Eliminate all rows since the last time the pos was negative.
-            if pos > 0:
-                i = df[qsum <= 0][-1:].index[0]
-            else:
-                i = df[qsum >= 0][-1:].index[0]
-
-            if is_near_zero(qsum[i]):
-                i += 1
-
-            df = df[i:]
-            df.reset_index(drop=True, inplace=True)
-
-            qsum = qsum[i:]
-
-            # df.loc[0, 'q'] = df.loc[0, 'qsum']
-            df.loc[0, 'q'] = qsum.iat[0]
-        except IndexError:
-            # Nothing to eliminate
-            pass
-
-    return df
-
-
 def wap_calc(df):
-    """
-    Calculated the Weighted Average Price
-    Assumption: df is in chronological order.
 
-    :param df:
-    :return wap:
+    _, df = separate_trades(df)
 
-    Calculate equivalent entry price for the current position such that the
-    PnL can be calculated with this formula:
+    if df.empty:
+        return 0
 
-    PnL = position * contract_size * (price - wap)
-
-    where:
-        position is the current position
-        contract_size is the number of shares per contract, typically 1 for stocks
-        price is the current price
-        wap is the weighted average price calculated by this method.
-
-
-    """
-
-    position = df.q.sum()
-    if is_near_zero(position):
-        return 0.0
-
-    cs = df.loc[0, 'cs']
-    df = df[['q', 'p', 'cs']]
-    df = remove_old_trades(df)
-    _, pl, _ = pnl(df, price=1.0)
-    wap = 1.0 - pl / position / cs
+    qp = df.q * df.p
+    wap = qp.sum() / df.q.sum()
 
     return wap
 

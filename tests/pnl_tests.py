@@ -49,23 +49,23 @@ class PnLTests(TradesBaseTest):
 
     def test_wap(self):
 
-        for a, t in (('ACCNT1', 'TICKER1'),
-                     ('ACCNT1', 'TICKER3'),
-                     ('ACCNT1', 'TICKER4'),
-                     ('ACCNT1', 'TICKER5'),
-                     ('ACCNT2', 'TICKER1'),
-                     ('ACCNT2', 'TICKER2'),
-                     ('ACCNT3', 'TICKER6'),
-                     ('ACCNT4', 'TICKER6')):
+        for a, t, wap_expected in (('ACCNT1', 'TICKER1', 310),
+                                   ('ACCNT1', 'TICKER3', 307),
+                                   ('ACCNT1', 'TICKER4', 300),
+                                   ('ACCNT1', 'TICKER5', 0),
+                                   ('ACCNT2', 'TICKER1', 0),
+                                   ('ACCNT2', 'TICKER2', 306.83333),
+                                   ('ACCNT3', 'TICKER6', 0),
+                                   ('ACCNT4', 'TICKER6', 0),
+                                   ('ACCNT5', 'CASE1', 499.578342),
+                                   ('ACCNT5', 'CASE2', 690),
+                                   ('ACCNT5', 'CASE3', 591.766830),
+                                   ('ACCNT5', 'CASE4', 465.6678),
+                                   ('ACCNT5', 'CASE5', 323.2794),
+                                   ):
 
-            df, _ = self.get_df(a=a, t=t)
-
-            position = df.q.sum()
-
-            _, pl_expected, _ = pnl(df, 1.0)
+            df, _ = self.get_df(a=a, t=t, year=2025)
 
             wap = wap_calc(df)
-
-            pl_calculated = position * (1.0 - wap)
-
-            self.assertAlmostEqual(pl_expected, pl_calculated)
+            # print(f"{a} {t} {wap} {wap_expected}")
+            self.assertAlmostEqual(wap, wap_expected, places=3, msg=f"{a} {t}")
