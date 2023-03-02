@@ -5,93 +5,6 @@ from .dt import day_start_next_day, day_start
 from .str_utils import is_near_zero
 
 
-def realized_trades(trades_df):
-    """
-    :param df:  Pandas dataframe with single account and ticker.
-    :return: realized_df Pandas dataframe of realized trades.
-    """
-
-    df = trades_df.copy()
-
-    buy_sum = df.where(df.q >= 0).q.sum()
-    sell_sum = -df.where(df.q < 0).q.sum()
-    delta = buy_sum - sell_sum
-
-    # Start
-    if buy_sum == sell_sum:
-        realized_df = df
-    if buy_sum > sell_sum:
-        last_i = df.where(df.q < 0).index[-1]
-        realized_df = df.head(last_i + 1)
-
-        # A short loop to reduce last sell trades by delta
-        for j in range(last_i, -1, -1):
-            rec = realized_df.loc[j]
-            q = rec.q
-            if q > 0:
-                if delta > q:
-                    delta -= q
-                    realized_df.at[j, 'q'] = 0
-                else:
-                    realized_df.at[j, 'q'] -= delta
-                    break
-
-    elif sell_sum > buy_sum:
-        last_i = df.where(df.q >= 0).index[-1]
-        realized_df = df.head(last_i + 1)
-
-        # A short loop to reduce last sell trades by delta
-        for j in range(last_i, -1, -1):
-            rec = realized_df.loc[j]
-            q = rec.q
-            if q < 0:
-                if delta < q:
-                    delta -= q
-                    realized_df.at[j, 'q'] = 0
-                else:
-                    realized_df.at[j, 'q'] -= delta
-                    break
-
-    realized_df.reset_index(drop=True, inplace=True)
-    return realized_df
-
-
-def pnl_calc(df, price=None):
-    '''
-    :param df:  Trades data frame
-    :return: profit or loss
-    '''
-    if df.empty:
-        return 0
-
-    pnl = -(df.q * df.p).sum()
-    if price:
-        pnl += df.q.sum() * price
-
-    cs = df.cs.iloc[0]
-    pnl *= cs
-
-    return pnl
-
-
-def pnl(df, price=0):
-    """
-    Calculate FIFO PnL
-
-    :param df: Pandas dataframe with single account and ticker
-    :param price:     Closing price if there are unrealized trades
-    :return:          realized pnl, unrealized pnl, total
-
-    IMPORTANT NOTE: The default value for price of zero is only useful when there is no open position.
-    """
-    realized_df = realized_trades(df)
-    realized_pnl = pnl_calc(realized_df)
-    total = pnl_calc(df, price=price)
-    unrealized_pnl = total - realized_pnl
-
-    return realized_pnl, unrealized_pnl, total
-
-
 def find_sign_change(df, csum=None):
     """
     Calculate csum and find the last sign change.
@@ -220,6 +133,42 @@ def separate_trades(df):
         unrealized_df = unrealized_df[unrealized_df.q != 0]
 
     return realized_df, unrealized_df
+
+
+def pnl_calc(df, price=None):
+    '''
+    :param df:  Trades data frame
+    :return: profit or loss
+    '''
+    if df.empty:
+        return 0
+
+    pnl = -(df.q * df.p).sum()
+    if price:
+        pnl += df.q.sum() * price
+
+    cs = df.cs.iloc[0]
+    pnl *= cs
+
+    return pnl
+
+
+def pnl(df, price=0):
+    """
+    Calculate FIFO PnL
+
+    :param df: Pandas dataframe with single account and ticker
+    :param price:     Closing price if there are unrealized trades
+    :return:          realized pnl, unrealized pnl, total
+
+    IMPORTANT NOTE: The default value for price of zero is only useful when there is no open position.
+    """
+    realized_df, unrealized_df = separate_trades(df)
+    realized_pnl = pnl_calc(realized_df)
+    unrealized_pnl = pnl_calc(unrealized_df)
+    total = realized_pnl + unrealized_pnl
+
+    return realized_pnl, unrealized_pnl, total
 
 
 def wap_calc(df):
