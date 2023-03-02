@@ -21,14 +21,16 @@ class FifoTests(TradesBaseTest):
                                  'realized': [90.0, -60.0, 190.00, 63.0]})
 
         df, _ = self.get_df()
+        df = df[df.a.isin(['ACCNT1', 'ACCNT2'])]
         pnl = realized_gains(df, year)
         pd.testing.assert_frame_equal(pnl, expected)
 
         df, _ = self.get_df(year)
+        df = df[df.a.isin(['ACCNT1', 'ACCNT2'])]
         pnl = realized_gains_fifo(df, year)
         # TICKER3 starts with a short position and realized_gains() doesn't work in that case
         pnl = pnl[pnl.t != 'TICKER3']
-        # TICKER5 has zero realized pnl in 2022
+        # Theese has zero realized pnl
         pnl = pnl[pnl.t != 'TICKER5']
         pnl.reset_index(drop=True, inplace=True)
         # TICKER4 has no trades or position 2022.

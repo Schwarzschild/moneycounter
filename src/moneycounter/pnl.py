@@ -99,7 +99,7 @@ def separate_trades(df):
         # Step 1
         unrealized_df = df.copy()
         csum, pos, i = find_sign_change(df)
-        unrealized_df.loc[:i, 'q'] = 0
+        unrealized_df.loc[:i, 'q'] = 0.0
         unrealized_df.loc[i, 'q'] = csum.loc[i]
 
         # Step 2
@@ -112,7 +112,7 @@ def separate_trades(df):
             flags = csum >= -q_sum
             i = csum[flags].index[0]
 
-            unrealized_df.loc[:i, 'q'] = 0
+            unrealized_df.loc[:i, 'q'] = 0.0
             unrealized_df.loc[i, 'q'] = csum.iat[i] + q_sum
         else:
             flags = unrealized_df.q > 0
@@ -123,7 +123,7 @@ def separate_trades(df):
             flags = csum <= -q_sum
             i = csum[flags].index[0]
 
-            unrealized_df.loc[:i, 'q'] = 0
+            unrealized_df.loc[:i, 'q'] = 0.0
             unrealized_df.loc[i, 'q'] = csum.iat[i] + q_sum
 
         realized_df = df.copy()
