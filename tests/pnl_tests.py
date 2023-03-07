@@ -78,3 +78,14 @@ class PnLTests(TradesBaseTest):
             wap = wap_calc(df)
             # print(f"{a} {t} {wap} {wap_expected}")
             self.assertAlmostEqual(wap, wap_expected, places=3, msg=f"{a} {t}")
+
+    def test_wap_with_split(self):
+        """
+         6 750
+         6   0  (Split 2:1)
+        -1 300
+        """
+
+        df, _ = self.get_df(a='ACCNT5', t='SPLIT')
+        wap = wap_calc(df)
+        self.assertAlmostEqual(wap, 340.9091, places=3)
