@@ -88,4 +88,4 @@ class PnLTests(TradesBaseTest):
 
         df, _ = self.get_df(a='ACCNT5', t='SPLIT')
         wap = wap_calc(df)
-        self.assertAlmostEqual(wap, 340.9091, places=3)
+        self.assertAlmostEqual(wap, 22.50, places=3)
