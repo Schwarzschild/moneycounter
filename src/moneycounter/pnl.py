@@ -1,7 +1,7 @@
 from datetime import date
 import pandas as pd
-from .dt import day_start_next_day, day_start
-from .str_utils import is_near_zero
+from tbgutils.dt import day_start_next_day, day_start
+from tbgutils.str import is_near_zero
 
 
 def find_sign_change(df, csum=None):

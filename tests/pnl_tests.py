@@ -1,6 +1,6 @@
 
 from test_base import TradesBaseTest
-from src.moneycounter.pnl import pnl, separate_trades, wap_calc, pnl_calc
+from src.moneycounter.pnl import separate_trades, wap_calc, pnl_calc
 
 
 class PnLTests(TradesBaseTest):

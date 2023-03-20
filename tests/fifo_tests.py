@@ -1,7 +1,6 @@
 
 import pandas as pd
 from test_base import TradesBaseTest
-# from src.moneycounter.pnl import fifo, realized_gains_fifo
 from src.moneycounter.pnl import realized_gains
 
 
