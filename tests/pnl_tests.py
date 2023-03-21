@@ -1,6 +1,6 @@
 
 from test_base import TradesBaseTest
-from src.moneycounter.pnl import pnl, separate_trades, wap_calc, pnl_calc
+from src.moneycounter.pnl import separate_trades, wap_calc, pnl_calc
 
 
 class PnLTests(TradesBaseTest):
@@ -64,8 +64,8 @@ class PnLTests(TradesBaseTest):
                                    ('ACCNT1', 'TICKER5', 0),
                                    ('ACCNT2', 'TICKER1', 0),
                                    ('ACCNT2', 'TICKER2', 306.83333),
-                                   ('ACCNT3', 'TICKER6', 0),
-                                   ('ACCNT4', 'TICKER6', 0),
+                                   ('ACCNT3', 'TICKER6', 75.0),
+                                   ('ACCNT4', 'TICKER6', 26.3695),
                                    ('ACCNT5', 'CASE1', 499.578342),
                                    ('ACCNT5', 'CASE2', 690),
                                    ('ACCNT5', 'CASE3', 591.766830),
@@ -78,3 +78,26 @@ class PnLTests(TradesBaseTest):
             wap = wap_calc(df)
             # print(f"{a} {t} {wap} {wap_expected}")
             self.assertAlmostEqual(wap, wap_expected, places=3, msg=f"{a} {t}")
+
+    def wap_with_split(self, a, t='SPLIT', expected=0):
+        p = 1.0
+
+        df, _ = self.get_df(a=a, t=t)
+        _, unrealized_df = separate_trades(df)
+        u = pnl_calc(unrealized_df, p)
+
+        wap = wap_calc(df)
+        self.assertAlmostEqual(wap, expected, places=3)
+
+        u_wap = df.q.sum() * (p - wap)
+        self.assertAlmostEqual(u_wap, u, places=3)
+
+    def test_wap_with_split(self):
+        """
+         6 750
+         6   0  (Split 2:1)
+        -1 300
+        """
+
+        self.wap_with_split(a='ACCNT5', expected=11.25)
+        self.wap_with_split(a='ACCNT6', expected=0.25)

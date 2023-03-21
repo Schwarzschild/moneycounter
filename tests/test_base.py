@@ -2,7 +2,7 @@ import os
 import unittest
 from datetime import datetime
 import pandas as pd
-from src.moneycounter.dt import our_localize
+from tbgutils.dt import our_localize
 
 
 class TradesBaseTest(unittest.TestCase):
