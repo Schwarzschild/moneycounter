@@ -4,6 +4,57 @@ from tbgutils.dt import day_start_next_day, day_start
 from tbgutils.str import is_near_zero
 
 
+def split_adjust(df):
+    """
+    :param df:
+    :return df:
+
+    Adjust quantities and prices to account for split trades.
+    Splits are identified by p=0
+    Do this process on all trades before calling separate_trades()
+    Better to add it to the beginning of separate_trades()
+    """
+
+    # Find location i of last split, spits are identified by p=0
+    split_trades_flags = df.p <= 1e-10
+    if not split_trades_flags.any():
+        return df
+
+    i = df[split_trades_flags][-1:].index[0]
+
+    # Find CSUM
+    csum = df.q.cumsum()
+
+    # Initialize Factor to 1 for all rows
+    factor = df.q.copy()
+    factor[:] = 1.0
+
+    # Calculate factor q/csum for split row
+    factor[split_trades_flags] = df[split_trades_flags].q / csum[split_trades_flags]
+
+    # Calculate factor = product of all Factor Values
+    factor = factor.cumprod().iloc[-1]
+
+    # Calculate q_new = q / factor for all rows
+    q_new = df.q / factor
+
+    # Calculate p_new = p * factor for all rows
+    p_new = df.p * factor
+
+    # Set q_new = q and p_new = p for all rows after i
+    i += 1
+    q_new[i:] = df.q[i:]
+    p_new[i:] = df.p[i:]
+    df.q = q_new
+    df.p = p_new
+
+    # Remove all split rows
+    df.drop(df.loc[split_trades_flags].index, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
+
 def find_sign_change(df, csum=None):
     """
     Calculate csum and find the last sign change.
@@ -89,6 +140,8 @@ def separate_trades(df):
     Remove all records where q=0 from both df_realized and df_unrealized
 
     """
+    df = split_adjust(df)
+
     pos = df.q.sum()
 
     if is_near_zero(pos):

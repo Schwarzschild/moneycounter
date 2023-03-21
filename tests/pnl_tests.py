@@ -79,6 +79,19 @@ class PnLTests(TradesBaseTest):
             # print(f"{a} {t} {wap} {wap_expected}")
             self.assertAlmostEqual(wap, wap_expected, places=3, msg=f"{a} {t}")
 
+    def wap_with_split(self, a, t='SPLIT', expected=0):
+        p = 1.0
+
+        df, _ = self.get_df(a=a, t=t)
+        _, unrealized_df = separate_trades(df)
+        u = pnl_calc(unrealized_df, p)
+
+        wap = wap_calc(df)
+        self.assertAlmostEqual(wap, expected, places=3)
+
+        u_wap = df.q.sum() * (p - wap)
+        self.assertAlmostEqual(u_wap, u, places=3)
+
     def test_wap_with_split(self):
         """
          6 750
@@ -86,6 +99,5 @@ class PnLTests(TradesBaseTest):
         -1 300
         """
 
-        df, _ = self.get_df(a='ACCNT5', t='SPLIT')
-        wap = wap_calc(df)
-        self.assertAlmostEqual(wap, 22.50, places=3)
+        self.wap_with_split(a='ACCNT5', expected=11.25)
+        self.wap_with_split(a='ACCNT6', expected=0.25)
