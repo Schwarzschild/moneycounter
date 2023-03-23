@@ -7,3 +7,4 @@ foo.py
 dist/
 build/
 *.egg-info
+*.numbers
