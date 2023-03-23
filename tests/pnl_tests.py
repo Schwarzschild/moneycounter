@@ -101,3 +101,5 @@ class PnLTests(TradesBaseTest):
 
         self.wap_with_split(a='ACCNT5', expected=11.25)
         self.wap_with_split(a='ACCNT6', expected=0.25)
+        self.wap_with_split(a='ACCNT7', expected=158.315)
+        self.wap_with_split(a='ACCNT8', expected=111.821)

@@ -1,4 +1,5 @@
 from datetime import date
+import numpy as np
 import pandas as pd
 from tbgutils.dt import day_start_next_day, day_start
 from tbgutils.str import is_near_zero
@@ -13,6 +14,10 @@ def split_adjust(df):
     Splits are identified by p=0
     Do this process on all trades before calling separate_trades()
     Better to add it to the beginning of separate_trades()
+
+    Only adjust trades since the last zero position because if there is a gap in position
+    there could have been more splits not recorded during that gap.  Without those the
+    earlier adjustments would be incorrect.
     """
 
     # Find location i of last split, spits are identified by p=0
@@ -20,10 +25,20 @@ def split_adjust(df):
     if not split_trades_flags.any():
         return df
 
-    i = df[split_trades_flags][-1:].index[0]
-
-    # Find CSUM
     csum = df.q.cumsum()
+
+    try:
+        # Find last zero position
+        zero_flags = np.abs(csum) < 1.e-10
+        zero_i = df[zero_flags][-1:].index[0] + 1
+        split_trades_flags.iloc[:zero_i] = False
+    except IndexError:
+        pass
+
+    try:
+        i = df[split_trades_flags][-1:].index[0]
+    except IndexError:
+        i = -1
 
     # Initialize Factor to 1 for all rows
     factor = df.q.copy()
@@ -140,6 +155,7 @@ def separate_trades(df):
     Remove all records where q=0 from both df_realized and df_unrealized
 
     """
+
     df = split_adjust(df)
 
     pos = df.q.sum()
@@ -183,6 +199,8 @@ def separate_trades(df):
 
         realized_df = realized_df[realized_df.q != 0]
         unrealized_df = unrealized_df[unrealized_df.q != 0]
+
+        unrealized_df.reset_index(drop=True, inplace=True)
 
     return realized_df, unrealized_df
 
