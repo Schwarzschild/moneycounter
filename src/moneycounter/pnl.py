@@ -18,54 +18,92 @@ def split_adjust(df):
     Only adjust trades since the last zero position because if there is a gap in position
     there could have been more splits not recorded during that gap.  Without those the
     earlier adjustments would be incorrect.
+
+    Note that if you use unrealized trades only you'll be sure not to include any trades before
+    the last zero position.
     """
+
+    df = df.copy()
 
     # Find location i of last split, spits are identified by p=0
     split_trades_flags = df.p <= 1e-10
     if not split_trades_flags.any():
         return df
 
+    df['csum'] = df.q.cumsum()
+
+    split_trades = df[split_trades_flags]
+
+    for index, row in split_trades.iterrows():
+        denominator = row.csum - row.q
+        factor = row.csum / denominator
+        df.iloc[:index].q *= factor
+        df.iloc[:index].p /= factor
+
+    df = df[~split_trades_flags]
+    df.drop(['csum'], axis=1)
+
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
+
+def fifo_remove(df):
+    """
+    Remove all trades that are closed out.
+    Assume the input df position, i.e. cumsum, is always the same sign and not zero.
+    i.e. All previous realized trades are removed.
+
+    :param df:
+    :return:
+
+    Example:
+
+    q    csum      q_new
+
+    10    10
+     5    15
+   -12     3
+    17    20
+    10    30         10
+   -20    10
+    5     15          5
+
+    The sum(q) = sum(q_new) = 15
+    Left with only three rows
+
+    """
+
+    position = df.q.sum()
+    if is_near_zero(position):
+        df = df.head(0)
+        return df
+
+    if position < 0:
+        df.q *= -1
+
     csum = df.q.cumsum()
 
-    try:
-        # Find last zero position
-        zero_flags = np.abs(csum) < 1.e-10
-        zero_i = df[zero_flags][-1:].index[0] + 1
-        split_trades_flags.iloc[:zero_i] = False
-    except IndexError:
-        pass
+    sells = df[df.q < 0]
 
-    try:
-        i = df[split_trades_flags][-1:].index[0]
-    except IndexError:
-        i = -1
+    for index, row in sells.iterrows():
+        q = -row.q
+        flags = csum > q
+        i = df[flags].index[0]
+        df.q.iloc[:i] = 0
+        residual = csum.iloc[i] - q
+        if not is_near_zero(residual):
+            df.at[i, 'q'] = residual
+        df.at[index, 'q'] = 0
 
-    # Initialize Factor to 1 for all rows
-    factor = df.q.copy()
-    factor[:] = 1.0
+        csum = df.q.cumsum()
 
-    # Calculate factor q/csum for split row
-    factor[split_trades_flags] = df[split_trades_flags].q / csum[split_trades_flags]
+    df = df[df.q > 0]
 
-    # Calculate factor = product of all Factor Values
-    factor = factor.cumprod().iloc[-1]
-
-    # Calculate q_new = q / factor for all rows
-    q_new = df.q / factor
-
-    # Calculate p_new = p * factor for all rows
-    p_new = df.p * factor
-
-    # Set q_new = q and p_new = p for all rows after i
-    i += 1
-    q_new[i:] = df.q[i:]
-    p_new[i:] = df.p[i:]
-    df.q = q_new
-    df.p = p_new
-
-    # Remove all split rows
-    df.drop(df.loc[split_trades_flags].index, inplace=True)
     df.reset_index(drop=True, inplace=True)
+
+    if position < 0:
+        df.q *= -1
 
     return df
 
@@ -76,6 +114,8 @@ def find_sign_change(df, csum=None):
 
     :param df:
     :return:
+
+    raises IndexError if there are no sign changes.
     """
 
     if csum is None:
@@ -88,121 +128,72 @@ def find_sign_change(df, csum=None):
     else:
         flags = csum >= 0
 
-    i = df.index[0]
-    if flags.any():
-        i = df[flags][-1:].index[0] + 1
+    i = df[flags][-1:].index[0] + 1
 
     return csum, pos, i
 
 
-def separate_trades(df):
+def eliminate_before_sign_change(df):
     """
-    Return two dataframes: 1. realized trades; and 2. unrealized trades.
+    Find last time csum pass through zero and remove all previous realized trades.
+    :param df:
+    :return:
+
+    Step 1
+        Copy df to df_unrealized
+        Find i at last csum sign change
+        Set all q before i to zero
+        Set q[i] = csum[i]
+
+    Step 2
+        q_sum = q[q > 0].sum()    Get sum of positive trades.
+        Set q[q > 0] = 0          Zero out all positive trades.
+        find csum
+        Find first time csum <= -q_sum at j
+        q[j] = csum[j] + q_sum
+
+    """
+
+    # Step 1
+
+    try:
+        csum, pos, i = find_sign_change(df)
+    except IndexError:
+        return df
+
+    df = df.copy()
+
+    df.loc[:i, 'q'] = 0.0
+    df.loc[i, 'q'] = csum.loc[i]
+
+    df = df[df.q.abs() > 1e-10]
+
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
+
+def unrealized(df):
+    """
+    Return a dataframe of split adjusted unrealized trades
 
     :param df:
     :return realized_df, unrealized_df:
 
-    Case 1
-     q     csum   realized    unrealized
-    +2      2        2            0
-    -2      0       -2            0
-    +10    10        6            4
-    -5      5       -5            0
-    +2      7        0            2
-    +1      8        0            1
-    -1      7       -1            0
-
-    Case 2
-    +2      2        0            2
-
-    Case 3
-     q     csum   realized    unrealized
-    +10    10       10            0
-    -5      5       -5            0
-    -20   -15       -6          -14
-    +1    -14        1            0
-    -2    -16        0           -2
-    +5    -11        5            0
-
-    Case 4
-         q     csum        q    csum       unrealized_q   realized_q
-        +10    10          0     0            0              10
-        -5      5          0     0            0              -5
-     i -11     -6         -6    -6            0             -11
-        -4    -10     =>  -4    -10     =>    0              -4
-        -5    -15         -5    -15          -3              -2
-       +12     -3          0    -15           0              12
-        -1     -4         -1    -16          -1               0
-                         q_sum = 12
-
-    To find unrealized:
-      Step 1
-            Copy df to df_unrealized
-            Find i at last csum sign change
-            Set all q before i to zero
-            Set q[i] = csum[i]
-
-      Step 2
-            q_sum = q[q > 0].sum()    Get sum of positive trades.
-            Set q[q > 0] = 0          Zero out all positive trades.
-            find csum
-            Find first time csum <= -q_sum at j
-            q[j] = csum[j] + q_sum
-
-
-    df_realized = df - df_unrealized
-
-    Remove all records where q=0 from both df_realized and df_unrealized
-
     """
-
-    df = split_adjust(df)
 
     pos = df.q.sum()
 
     if is_near_zero(pos):
-        unrealized_df = df.head(0)
-        realized_df = df
-    else:
-        # Step 1
-        unrealized_df = df.copy()
-        csum, pos, i = find_sign_change(df)
-        unrealized_df.loc[:i, 'q'] = 0.0
-        unrealized_df.loc[i, 'q'] = csum.loc[i]
+        return df.head(0)
 
-        # Step 2
-        if pos >= 0:
-            flags = unrealized_df.q < 0
-            q_sum = unrealized_df[flags].q.sum()
-            unrealized_df.loc[flags, 'q'] = 0
+    unrealized_df = eliminate_before_sign_change(df)
+    unrealized_df = split_adjust(unrealized_df)
+    unrealized_df = fifo_remove(unrealized_df)
 
-            csum = unrealized_df.q.cumsum()
-            flags = csum >= -q_sum
-            i = csum[flags].index[0]
+    unrealized_df = unrealized_df[unrealized_df.q != 0]
 
-            unrealized_df.loc[:i, 'q'] = 0.0
-            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_sum
-        else:
-            flags = unrealized_df.q > 0
-            q_sum = unrealized_df[flags].q.sum()
-            unrealized_df.loc[flags, 'q'] = 0
-
-            csum = unrealized_df.q.cumsum()
-            flags = csum <= -q_sum
-            i = csum[flags].index[0]
-
-            unrealized_df.loc[:i, 'q'] = 0.0
-            unrealized_df.loc[i, 'q'] = csum.iat[i] + q_sum
-
-        realized_df = df.copy()
-        realized_df.q = df.q - unrealized_df.q
-
-        realized_df = realized_df[realized_df.q != 0]
-        unrealized_df = unrealized_df[unrealized_df.q != 0]
-
-        unrealized_df.reset_index(drop=True, inplace=True)
-
-    return realized_df, unrealized_df
+    return unrealized_df
 
 
 def pnl_calc(df, price=None):
@@ -233,17 +224,18 @@ def pnl(df, price=0):
 
     IMPORTANT NOTE: The default value for price of zero is only useful when there is no open position.
     """
-    realized_df, unrealized_df = separate_trades(df)
-    realized_pnl = pnl_calc(realized_df)
-    unrealized_pnl = pnl_calc(unrealized_df)
-    total = realized_pnl + unrealized_pnl
+
+    total = pnl_calc(df, price=price)
+    unrealized_df = unrealized(df)
+    unrealized_pnl = pnl_calc(unrealized_df, price=price)
+    realized_pnl = total - unrealized_pnl
 
     return realized_pnl, unrealized_pnl, total
 
 
 def wap_calc(df):
 
-    _, df = separate_trades(df)
+    df = unrealized(df)
 
     if df.empty:
         return 0
@@ -252,85 +244,6 @@ def wap_calc(df):
     wap = qp.sum() / df.q.sum()
 
     return wap
-
-#
-# def fifo(dfg, dt):
-#     """
-#     Calculate realized gains for sells later than d.
-#     THIS ONLY WORKS FOR TRADES ENTERED AS LONG POSITIONS
-#     Loop forward from bottom
-#        0. Initialize pnl = 0 (scalar)
-#        1. everytime we hit a sell
-#           a. if dfg.dt > dt: calculate and add it to pnl
-#           b. reduce q for sell and corresponding buy records.
-#     """
-#
-#     def realize_q(n, row):
-#         pnl = 0
-#         quantity = row.q
-#         add_pnl = row['dt'] >= dt
-#         cs = row.cs
-#         price = row.p
-#
-#         for j in range(n):
-#             buy_row = dfg.iloc[j]
-#             if buy_row.q <= 0.0001:
-#                 continue
-#
-#             q = -quantity
-#             if buy_row.q >= q:
-#                 adj_q = q
-#             else:
-#                 adj_q = buy_row.q
-#
-#             if add_pnl:
-#                 pnl += cs * adj_q * (price - buy_row.p)
-#
-#             dfg.at[j, 'q'] = buy_row.q - adj_q
-#             quantity += adj_q
-#             dfg.at[n, 'q'] = quantity
-#
-#             if quantity > 0.0001:
-#                 break
-#
-#         return pnl
-#
-#     realized = 0
-#     dfg.reset_index(drop=True, inplace=True)
-#     for i in range(len(dfg)):
-#         row = dfg.iloc[i]
-#         if row.q < 0:
-#             pnl = realize_q(i, row)
-#             realized += pnl
-#
-#     return realized
-
-
-def stocks_sold(trades_df, year):
-    # Find any stock sells this year
-    t1 = day_start(date(year, 1, 1))
-    t2 = day_start_next_day(date(year, 12, 31))
-    mask = (trades_df['dt'] >= t1) & (trades_df['dt'] < t2) & (trades_df['q'] < 0)
-    sells_df = trades_df.loc[mask]
-    return sells_df
-
-
-# def realized_gains_fifo(trades_df, year):
-#     #
-#     # Use this to find realized pnl for things sold this year
-#     #
-#     dt = our_localize(datetime(year, 1, 1))
-#     sells_df = stocks_sold(trades_df, year)
-#     a_t = sells_df.loc[:, ['a', 't']]
-#     a_t = a_t.drop_duplicates()
-#
-#     # get only trades for a/t combos that had sold anything in the given year
-#     df = pd.merge(trades_df, a_t, how='inner', on=['a', 't'])
-#
-#     # df['d'] = pd.to_datetime(df.dt).dt.date
-#     realized = df.groupby(['a', 't']).apply(fifo, dt).reset_index(name="realized")
-#
-#     return realized
 
 
 def realized_gains_one(trades_df, year):
