@@ -1,8 +1,22 @@
 import os
 import unittest
 from datetime import datetime
+import numpy as np
 import pandas as pd
 from tbgutils.dt import our_localize
+
+
+def fake_trades(n=100):
+    df = pd.DataFrame(columns=['dt', 'q', 'p', 'cs', 't', 'a'])
+
+    df['dt'] = pd.to_datetime(np.arange(1, n * 1e9, 1e9))
+    df['q'] = np.random.randint(-1, 2, size=n)
+    df['p'] = 100 + np.random.random(size=n) * 30
+    df['cs'] = np.full(n, 1)
+    df['t'] = np.full(n, 'TICKER')
+    df['a'] = np.full(n, 'ACCOUNT')
+
+    return df
 
 
 class TradesBaseTest(unittest.TestCase):
