@@ -1,5 +1,5 @@
 
-from test_base import TradesBaseTest
+from test_base import TradesBaseTest, fake_trades
 from src.moneycounter.pnl import unrealized, wap_calc, pnl_calc, split_adjust, fifo_remove, pnl
 
 
@@ -99,3 +99,13 @@ class PnLTests(TradesBaseTest):
     def test_fifo_remove(self):
         self.fifo_remove_helper('ACCNT7')
         self.fifo_remove_helper('ACCNT8')
+
+
+class BigTests(TradesBaseTest):
+    def test_wap(self):
+        print('Making fake trades.')
+        # df = fake_trades(1_000_000)
+        df = fake_trades(10)
+        print('Calculating WAP.')
+        wap = wap_calc(df)
+        print(wap)

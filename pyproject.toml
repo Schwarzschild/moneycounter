@@ -17,7 +17,7 @@ classifiers = [
     ]
 license = {text = "MIT"}
 dependencies = ["pandas==1.5.2", "pytz==2022.7"]
-version = "1.2.2"
+version = "1.2.3"
 
 [project.urls]
 homepage = "https://github.com/schwarzschild/moneycounter"
