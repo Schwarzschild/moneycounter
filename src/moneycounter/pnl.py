@@ -37,8 +37,8 @@ def split_adjust(df):
     for index, row in split_trades.iterrows():
         denominator = row.csum - row.q
         factor = row.csum / denominator
-        df.iloc[:index].q *= factor
-        df.iloc[:index].p /= factor
+        df.loc[:index, 'q'] *= factor
+        df.loc[:index, 'p'] /= factor
 
     df = df[~split_trades_flags]
     df.drop(['csum'], axis=1)
@@ -90,7 +90,7 @@ def fifo_remove(df):
         q = -row.q
         flags = csum > q
         i = df[flags].index[0]
-        df.q.iloc[:i] = 0
+        df.loc[:i, 'q'] = 0
         residual = csum.iloc[i] - q
         if not is_near_zero(residual):
             df.at[i, 'q'] = residual
