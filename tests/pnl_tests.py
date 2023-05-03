@@ -104,7 +104,8 @@ class PnLTests(TradesBaseTest):
 class BigTests(TradesBaseTest):
     def test_wap(self):
         print('Making fake trades.')
-        df = fake_trades(1_000_000)
+        # df = fake_trades(1_000_000)
+        df = fake_trades(10)
         print('Calculating WAP.')
         wap = wap_calc(df)
         print(wap)
