@@ -103,7 +103,7 @@ def fifo_remove(df):
     df.reset_index(drop=True, inplace=True)
 
     if position < 0:
-        df.q *= -1
+        df.loc[:, 'q'] *= -1
 
     return df
 

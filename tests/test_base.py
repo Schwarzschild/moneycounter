@@ -10,7 +10,11 @@ def fake_trades(n=100):
     df = pd.DataFrame(columns=['dt', 'q', 'p', 'cs', 't', 'a'])
 
     df['dt'] = pd.to_datetime(np.arange(1, n * 1e9, 1e9))
-    df['q'] = np.random.randint(-1, 2, size=n)
+    np.random.seed(42)
+    x = np.random.randint(0, 2, size=n)
+    x[x == 0] = -1
+    df['q'] = x
+    np.random.seed(73)
     df['p'] = 100 + np.random.random(size=n) * 30
     df['cs'] = np.full(n, 1)
     df['t'] = np.full(n, 'TICKER')

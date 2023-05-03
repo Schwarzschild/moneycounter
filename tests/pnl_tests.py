@@ -22,7 +22,7 @@ class PnLTests(TradesBaseTest):
 
             df, _ = self.get_df(a=a, t=t, year=2025)
             realized_pnl, unrealized_pnl, total = pnl(df, 1.0)
-            print(a, t, realized_pnl, unrealized_pnl)
+            # print(a, t, realized_pnl, unrealized_pnl)
             self.assertAlmostEqual(realized_pnl, r, places=3, msg=f"{a} {t}")
             self.assertAlmostEqual(unrealized_pnl, u, places=3, msg=f"{a} {t}")
 
@@ -103,9 +103,6 @@ class PnLTests(TradesBaseTest):
 
 class BigTests(TradesBaseTest):
     def test_wap(self):
-        print('Making fake trades.')
-        # df = fake_trades(1_000_000)
-        df = fake_trades(10)
-        print('Calculating WAP.')
+        df = fake_trades(100_000)
         wap = wap_calc(df)
-        print(wap)
+        self.assertAlmostEqual(wap, 113.785, places=3)
